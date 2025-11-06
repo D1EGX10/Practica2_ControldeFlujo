@@ -4,8 +4,8 @@ import random
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5500
-WINDOW_SIZE = 5          
-PACKET_SIZE = 1024       
+WINDOW_SIZE = 5
+PACKET_SIZE = 1024
 LOSS_PROBABILITY = 0.05  
 
 def servidor():
@@ -20,7 +20,7 @@ def servidor():
 
     print("Solicitud recibida. Iniciando envío...")
 
-  
+   
     with open("SMB.mp3", "rb") as f:
         partes = []
         i = 0
@@ -32,44 +32,44 @@ def servidor():
     print(f"Total de paquetes: {total_paquetes}")
 
     base = 0
-    pendientes_ack = set(range(total_paquetes))
+    next_seq = 0
+    ultimo_ack = -1
+    sock.settimeout(2)
 
     while base < total_paquetes:
-        
-        for i in range(base, min(base + WINDOW_SIZE, total_paquetes)):
-            if i in pendientes_ack:
-    
-                if random.random() < LOSS_PROBABILITY:
-                    print(f"Paquete {i} perdido (simulado)")
-                    continue
+       
+        while next_seq < base + WINDOW_SIZE and next_seq < total_paquetes:
+            if random.random() > LOSS_PROBABILITY:
+                sock.sendto(partes[next_seq], addr)
+                print(f"Enviado paquete {next_seq}")
+            else:
+                print(f"Paquete {next_seq} perdido (simulado)")
+            next_seq += 1
 
-                sock.sendto(partes[i], addr)
-                print(f"Enviado paquete {i}")
-
-        sock.settimeout(2)
         try:
             data, _ = sock.recvfrom(1024)
             if data.startswith(b"ACK|"):
                 ack_num = int(data.decode().split("|")[1])
-                if ack_num in pendientes_ack:
-                    pendientes_ack.remove(ack_num)
-                    print(f" ACK recibido: {ack_num}")
+                print(f"ACK recibido: {ack_num}")
 
-                # Mover ventana si corresponde
-                while base not in pendientes_ack and base < total_paquetes:
-                    base += 1
+                if ack_num >= base:
+                    base = ack_num + 1
+                    ultimo_ack = ack_num
 
         except socket.timeout:
-            print("⏱️ Tiempo de espera excedido. Reenviando ventana...")
+            print("Timeout: reenviando desde el último ACK confirmado...")
+            
+            next_seq = base
 
         time.sleep(0.05)
 
-    # Envío final
     sock.sendto(b"FIN", addr)
-    print("🎵 Transmisión finalizada.")
+    print("Transmisión finalizada correctamente.")
 
 if __name__ == "__main__":
     servidor()
+
+
 
 
 
