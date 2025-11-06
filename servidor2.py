@@ -3,7 +3,7 @@ import time
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5500
-WINDOW_SIZE = 5  # Tamaño de la ventana deslizante
+WINDOW_SIZE = 5
 PACKET_SIZE = 1024
 
 def servidor():
@@ -26,26 +26,35 @@ def servidor():
         print(f"Total de paquetes: {total_paquetes}")
 
         base = 0
+        ultimo_ack = -1
+
         while base < total_paquetes:
             for i in range(base, min(base + WINDOW_SIZE, total_paquetes)):
                 sock.sendto(partes[i], addr)
                 print(f"Enviado paquete {i}")
 
-            sock.settimeout(2)
+            sock.settimeout(1.5)
             try:
                 data, _ = sock.recvfrom(1024)
                 if data.startswith(b"ACK|"):
                     ack_num = int(data.decode().split("|")[1])
-                    base = ack_num + 1
                     print(f"ACK recibido: {ack_num}")
+
+                    if ack_num > ultimo_ack:
+                        ultimo_ack = ack_num
+                        base = ack_num + 1
+                    else:
+                        print(f"ACK repetido {ack_num}, ignorando...")
             except socket.timeout:
-                print("Tiempo de espera excedido. Reenviando ventana...")
-            time.sleep(0.05)
+                print(" Timeout: reenviando ventana no confirmada...")
+
+            time.sleep(0.1)
 
         sock.sendto(b"FIN", addr)
-        print("Transmisión finalizada.")
+        print("Transmisión finalizada correctamente.")
 
 if __name__ == "__main__":
     servidor()
+
 
 
